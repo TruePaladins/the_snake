@@ -1,4 +1,3 @@
-from collections import deque
 from random import randint
 
 import pygame
@@ -28,7 +27,7 @@ APPLE_COLOR = (255, 0, 0)
 SNAKE_COLOR = (0, 255, 0)
 
 # Скорость движения змейки:
-SPEED = 5
+SPEED = 10
 
 # Настройка игрового окна:
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
@@ -40,7 +39,6 @@ pygame.display.set_caption('Змейка')
 clock = pygame.time.Clock()
 
 
-# Тут опишите все классы игры.
 class GameObject:
     """Базовый класс для игровых объектов."""
 
@@ -61,26 +59,28 @@ class Apple(GameObject):
         """Инициализация яблока с случайной позицией."""
         super().__init__()
         self.body_color = APPLE_COLOR
-        self.randomize_position = (
+        self.randomize_position()
+
+    def randomize_position(self):
+        """Установить яблоко на случайную позицию."""
+        self.position = (
             (randint(0, GRID_WIDTH - 1) * GRID_SIZE),
             (randint(0, GRID_HEIGHT - 1) * GRID_SIZE)
         )
-        self.position = self.randomize_position
 
-    def reset_position(self, snake):
-        """Сгенерировать новую позицию яблока, избегая тела змейки."""
-        while True:
+    def reset_position(self, positions):
+        """Генерировать новую позицию яблока, избегая тела змейки."""
+        new_position = None
+        while new_position is None or new_position in positions:
             new_position = (
                 (randint(0, GRID_WIDTH - 1) * GRID_SIZE),
                 (randint(0, GRID_HEIGHT - 1) * GRID_SIZE)
             )
-            if new_position not in snake.positions:
-                self.randomize_position = new_position
-                break
+        self.position = new_position
 
     def draw(self):
         """Отрисовка яблока на экране."""
-        rect = pygame.Rect(self.randomize_position,
+        rect = pygame.Rect(self.position,
                            (GRID_SIZE, GRID_SIZE))
         pygame.draw.rect(screen, self.body_color, rect)
         pygame.draw.rect(screen, BORDER_COLOR, rect, 1)
@@ -93,7 +93,16 @@ class Snake(GameObject):
         """Инициализация змейки в центре экрана."""
         super().__init__()
         self.body_color = SNAKE_COLOR
-        self.positions = deque([((SCREEN_WIDTH // 2), (SCREEN_HEIGHT // 2))])
+        # вынесем инициализацию в отдельный метод, чтобы избежать вызова
+        # конструктора на уже созданном объекте при сбросе
+        self.reset()
+
+    def reset(self):
+        """Установить начальные параметры змейки.
+
+        Этот метод используется и внутри конструктора, и при сбросе игры.
+        """
+        self.positions = [((SCREEN_WIDTH // 2), (SCREEN_HEIGHT // 2))]
         self.length = 1
         self.direction = RIGHT
         self.next_direction = None
@@ -112,30 +121,15 @@ class Snake(GameObject):
     def move(self):
         """Переместить змейку в направлении движения."""
         self.update_direction()
-        if self.direction == RIGHT:
-            self.positions.appendleft((
-                int((self.positions[0][0] + GRID_SIZE)) % SCREEN_WIDTH,
-                self.positions[0][1] % SCREEN_HEIGHT
-            ))
-        elif self.direction == UP:
-            self.positions.appendleft((
-                self.positions[0][0] % SCREEN_WIDTH,
-                int((self.positions[0][1] - GRID_SIZE)) % SCREEN_HEIGHT
-            ))
-        elif self.direction == LEFT:
-            self.positions.appendleft((
-                int((self.positions[0][0] - GRID_SIZE)) % SCREEN_WIDTH,
-                self.positions[0][1] % SCREEN_HEIGHT
-            ))
-        elif self.direction == DOWN:
-            self.positions.appendleft((
-                self.positions[0][0] % SCREEN_WIDTH,
-                int((self.positions[0][1] + GRID_SIZE)) % SCREEN_HEIGHT
-            ))
+        head_x, head_y = self.positions[0]
+        new_head = (
+            int((head_x + self.direction[0] * GRID_SIZE)) % SCREEN_WIDTH,
+            int((head_y + self.direction[1] * GRID_SIZE)) % SCREEN_HEIGHT
+        )
+        self.positions.insert(0, new_head)
 
         if self.length < len(self.positions):
-            self.last = self.positions[-1]
-            self.positions.pop()
+            self.last = self.positions.pop()
 
     def draw(self):
         """Отрисовать змейку на экране."""
@@ -145,7 +139,7 @@ class Snake(GameObject):
             pygame.draw.rect(screen, BORDER_COLOR, rect, 1)
 
         # Отрисовка головы змейки
-        head_rect = pygame.Rect(self.positions[0], (GRID_SIZE, GRID_SIZE))
+        head_rect = pygame.Rect(self.get_head_position(), (GRID_SIZE, GRID_SIZE))
         pygame.draw.rect(screen, self.body_color, head_rect)
         pygame.draw.rect(screen, BORDER_COLOR, head_rect, 1)
 
@@ -153,10 +147,6 @@ class Snake(GameObject):
         if self.last:
             last_rect = pygame.Rect(self.last, (GRID_SIZE, GRID_SIZE))
             pygame.draw.rect(screen, BOARD_BACKGROUND_COLOR, last_rect)
-
-    def reset(self):
-        """Повторно инициализировать змейку."""
-        self.__init__()
 
 
 def handle_keys(game_object):
@@ -180,7 +170,6 @@ def main():
     """Основной цикл игры."""
     # Инициализация PyGame:
     pygame.init()
-    # Тут нужно создать экземпляры классов.
     apple = Apple()
     snake = Snake()
 
@@ -190,9 +179,9 @@ def main():
         snake.draw()
         handle_keys(snake)
         snake.move()
-        if snake.get_head_position() == apple.randomize_position:
+        if snake.get_head_position() == apple.position:
             snake.length += 1
-            apple.reset_position(snake)
+            apple.reset_position(snake.positions)
             apple.draw()
         elif snake.get_head_position() in list(snake.positions)[1:]:
             snake.reset()
