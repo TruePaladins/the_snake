@@ -65,14 +65,13 @@ class Apple(GameObject):
         """Установить яблоко на случайную позицию, избегая занятых позиций."""
         if occupied_positions is None:
             occupied_positions = []
-        while True:
+        new_position = None
+        while new_position is None or new_position in occupied_positions:
             new_position = (
                 (randint(0, GRID_WIDTH - 1) * GRID_SIZE),
                 (randint(0, GRID_HEIGHT - 1) * GRID_SIZE)
             )
-            if new_position not in occupied_positions:
-                self.position = new_position
-                break
+        self.position = new_position
 
     def draw(self):
         """Отрисовка яблока на экране."""
@@ -118,9 +117,10 @@ class Snake(GameObject):
         """Переместить змейку в направлении движения."""
         self.update_direction()
         head_x, head_y = self.get_head_position()
+        dx, dy = self.direction
         new_head = (
-            (head_x + self.direction[0] * GRID_SIZE) % SCREEN_WIDTH,
-            (head_y + self.direction[1] * GRID_SIZE) % SCREEN_HEIGHT
+            (head_x + dx * GRID_SIZE) % SCREEN_WIDTH,
+            (head_y + dy * GRID_SIZE) % SCREEN_HEIGHT
         )
         self.positions.insert(0, new_head)
 
